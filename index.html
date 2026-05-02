@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inside optimizer.step()</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Inside <code>optimizer.step()</code></h1>
+    <p>See how <code>zero_grad()</code>, <code>backward()</code>, and <code>step()</code> work together during training.</p>
+  </header>
+
+  <main>
+    <section class="card" id="loss-panel">
+      <h2>Loss Landscape</h2>
+      <canvas id="lossCanvas" width="420" height="260"></canvas>
+    </section>
+
+    <section class="card" id="code-panel">
+      <h2>Training Loop</h2>
+      <pre><code id="codeBlock"><span id="line-0">for batch in data:</span>
+<span id="line-1">    optim.zero_grad()</span>
+<span id="line-2">    output = model(x)</span>
+<span id="line-3">    loss = criterion(output, y)</span>
+<span id="line-4">    loss.backward()</span>
+<span id="line-5">    optim.step()</span></code></pre>
+      <div id="line-explanation"></div>
+    </section>
+
+    <section class="card" id="state-panel">
+      <h2>Optimizer State</h2>
+      <table id="stateTable">
+        <tbody>
+          <tr><td>Parameter <em>w</em></td><td><span id="val-w">—</span></td></tr>
+          <tr><td>Loss</td><td><span id="val-loss">—</span></td></tr>
+          <tr><td>Gradient</td><td><span id="val-grad">—</span></td></tr>
+          <tr><td>Accumulated Gradient</td><td><span id="val-accum">—</span></td></tr>
+          <tr><td>Learning Rate</td><td><span id="val-lr">0.1</span></td></tr>
+          <tr id="row-velocity" class="hidden"><td>Momentum Velocity</td><td><span id="val-velocity">—</span></td></tr>
+          <tr id="row-adam-m" class="hidden"><td>Adam m̂ (1st moment)</td><td><span id="val-adam-m">—</span></td></tr>
+          <tr id="row-adam-v" class="hidden"><td>Adam v̂ (2nd moment)</td><td><span id="val-adam-v">—</span></td></tr>
+          <tr><td>Step Count</td><td><span id="val-steps">0</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="controls-panel">
+      <h2>Controls</h2>
+
+      <div class="control-group">
+        <button id="btn-step">Step →</button>
+        <button id="btn-auto">Auto Run</button>
+        <button id="btn-reset">Reset</button>
+      </div>
+
+      <div class="control-group">
+        <button id="toggle-zerog" class="toggle-on">zero_grad(): ON</button>
+        <p class="hint" id="zerog-hint">Gradients are cleared before each backward pass.</p>
+      </div>
+
+      <div class="control-group">
+        <label for="slider-lr">Learning Rate: <strong id="lr-display">0.10</strong></label>
+        <input type="range" id="slider-lr" min="0.01" max="1.0" step="0.01" value="0.1">
+      </div>
+
+      <div class="control-group">
+        <label for="select-optimizer">Optimizer:</label>
+        <select id="select-optimizer">
+          <option value="sgd">SGD</option>
+          <option value="momentum">SGD + Momentum</option>
+          <option value="adam">Adam</option>
+        </select>
+      </div>
+
+      <div class="optimizer-desc" id="opt-desc">
+        <strong>SGD:</strong> w = w − lr × grad
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

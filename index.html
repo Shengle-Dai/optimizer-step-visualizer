@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watch an LSTM Remember</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <h1>Watch an LSTM Remember</h1>
+      <p>Step through a sentence and see how an LSTM uses gates to decide what to <span class="cl-forget">forget</span>, what to <span class="cl-input">store</span>, and what to <span class="cl-output">output</span>.</p>
+    </header>
+
+    <section class="card setup-card">
+      <div class="setup-row">
+        <label for="presetSelect">Preset:</label>
+        <select id="presetSelect"></select>
+      </div>
+      <div class="setup-row">
+        <label for="customInput">Custom:</label>
+        <input id="customInput" type="text" placeholder="Type a short sentence and press Enter…">
+        <button id="loadSentenceBtn">Load</button>
+      </div>
+    </section>
+
+    <section class="card timeline-card">
+      <div class="card-head">
+        <h2>Token Timeline</h2>
+        <span id="stepCounter" class="step-counter">—</span>
+      </div>
+      <div id="tokenTimeline" class="token-row"></div>
+    </section>
+
+    <section class="main-grid">
+      <section class="card cell-card">
+        <h2>LSTM Cell</h2>
+        <div id="lstmDiagram" class="diagram-wrap"></div>
+      </section>
+
+      <aside class="side-panel">
+        <section class="card gates-card">
+          <h2>Gates</h2>
+          <div id="gateBars"></div>
+        </section>
+
+        <section class="card memory-card">
+          <h2>Cell-State Memory</h2>
+          <div id="memoryBars"></div>
+          <p id="memorySummary" class="muted-summary"></p>
+        </section>
+
+        <section class="card sentiment-card">
+          <h2>Sentiment Prediction</h2>
+          <div id="sentimentBars"></div>
+          <p id="sentimentLabel" class="sentiment-label">—</p>
+        </section>
+      </aside>
+    </section>
+
+    <section class="card explanation-card">
+      <h2>What happened at this step?</h2>
+      <p id="stepExplanation" class="step-text">Click <strong>Next</strong> to start reading the sentence.</p>
+    </section>
+
+    <section class="card controls-card">
+      <button id="prevBtn">◀ Previous</button>
+      <button id="nextBtn" class="primary">Next ▶</button>
+      <button id="autoBtn">Auto-play</button>
+      <button id="resetBtn">Reset</button>
+      <label class="speed-label" for="speedSlider">Step duration: <strong id="speedDisplay">4.1s/step</strong></label>
+      <input id="speedSlider" type="range" min="300" max="2000" step="100" value="900">
+    </section>
+
+    <section class="card math-card">
+      <details>
+        <summary>Show LSTM equations</summary>
+        <div id="mathEquations" class="math-grid"></div>
+      </details>
+    </section>
+
+    <footer class="hero-foot">
+      Educational simulation — uses rule-based gates so internal state stays interpretable. Not a trained model.
+    </footer>
+  </main>
+
+  <div id="tooltip" class="tooltip-box" role="tooltip"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

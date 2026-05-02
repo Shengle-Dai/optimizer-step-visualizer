@@ -35,7 +35,6 @@ function drawCanvas() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
 
-  // Background
   ctx.fillStyle = "#0d1117";
   ctx.fillRect(0, 0, W, H);
 
@@ -43,7 +42,6 @@ function drawCanvas() {
   const plotH = H - PAD.top - PAD.bottom;
   const plotW = W - PAD.left - PAD.right;
 
-  // Grid lines
   ctx.strokeStyle = "#21262d";
   ctx.lineWidth = 1;
   for (let gx = Math.ceil(X_MIN); gx <= Math.floor(X_MAX); gx++) {
@@ -52,7 +50,6 @@ function drawCanvas() {
     ctx.stroke();
   }
 
-  // Axes
   ctx.strokeStyle = "#30363d";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -64,13 +61,11 @@ function drawCanvas() {
   ctx.lineTo(PAD.left, PAD.top + plotH);
   ctx.stroke();
 
-  // Axis labels
   ctx.fillStyle = "#8b949e";
   ctx.font = "11px system-ui";
   ctx.textAlign = "center";
   for (let gx = Math.ceil(X_MIN); gx <= Math.floor(X_MAX); gx += 2) {
-    const cx = toCanvasX(gx);
-    ctx.fillText(gx, cx, PAD.top + plotH + 16);
+    ctx.fillText(gx, toCanvasX(gx), PAD.top + plotH + 16);
   }
   ctx.textAlign = "right";
   const yTicks = [0, Math.round(yMax * 0.33), Math.round(yMax * 0.66), Math.round(yMax)];
@@ -79,10 +74,7 @@ function drawCanvas() {
     if (cy >= PAD.top && cy <= PAD.top + plotH)
       ctx.fillText(yt, PAD.left - 6, cy + 4);
   });
-
   ctx.textAlign = "center";
-  ctx.fillStyle = "#8b949e";
-  ctx.font = "11px system-ui";
   ctx.fillText("w", PAD.left + plotW + 10, PAD.top + plotH + 4);
   ctx.save();
   ctx.translate(14, PAD.top + plotH / 2);
@@ -90,14 +82,12 @@ function drawCanvas() {
   ctx.fillText("loss", 0, 0);
   ctx.restore();
 
-  // Minimum dashed line
   const targetX = toCanvasX(state.target);
   ctx.strokeStyle = "#3fb95055";
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
-  ctx.moveTo(targetX, PAD.top);
-  ctx.lineTo(targetX, PAD.top + plotH);
+  ctx.moveTo(targetX, PAD.top); ctx.lineTo(targetX, PAD.top + plotH);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = "#3fb95088";
@@ -105,21 +95,16 @@ function drawCanvas() {
   ctx.textAlign = "center";
   ctx.fillText("min", targetX, PAD.top - 8);
 
-  // Parabola
   ctx.strokeStyle = "#58a6ff";
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  const steps = 200;
-  for (let i = 0; i <= steps; i++) {
-    const x = X_MIN + (i / steps) * (X_MAX - X_MIN);
-    const y = lossVal(x);
-    const cx = toCanvasX(x);
-    const cy = toCanvasY(Math.min(y, yMax), yMax);
-    i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
+  for (let i = 0; i <= 200; i++) {
+    const x = X_MIN + (i / 200) * (X_MAX - X_MIN);
+    const cy = toCanvasY(Math.min(lossVal(x), yMax), yMax);
+    i === 0 ? ctx.moveTo(toCanvasX(x), cy) : ctx.lineTo(toCanvasX(x), cy);
   }
   ctx.stroke();
 
-  // Parameter dot
   const wClamped = Math.max(X_MIN, Math.min(X_MAX, state.w));
   const lossAtW = Math.min(lossVal(state.w), yMax);
   const dotX = toCanvasX(wClamped);
@@ -127,40 +112,31 @@ function drawCanvas() {
   const diverged = Math.abs(state.w) > 12;
   const dotColor = diverged ? "#f85149" : "#3fb950";
 
-  // Gradient arrow
   if (state.grad !== 0 && !diverged) {
     const arrowLen = 28;
     const dir = state.grad > 0 ? -1 : 1;
     ctx.strokeStyle = "#d29922";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(dotX, dotY);
-    ctx.lineTo(dotX + dir * arrowLen, dotY);
+    ctx.moveTo(dotX, dotY); ctx.lineTo(dotX + dir * arrowLen, dotY);
     ctx.stroke();
     ctx.fillStyle = "#d29922";
     ctx.beginPath();
     ctx.moveTo(dotX + dir * arrowLen, dotY);
     ctx.lineTo(dotX + dir * (arrowLen - 7), dotY - 4);
     ctx.lineTo(dotX + dir * (arrowLen - 7), dotY + 4);
-    ctx.closePath();
-    ctx.fill();
+    ctx.closePath(); ctx.fill();
   }
 
-  ctx.beginPath();
-  ctx.arc(dotX, dotY, 8, 0, Math.PI * 2);
-  ctx.fillStyle = dotColor + "33";
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
-  ctx.fillStyle = dotColor;
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(dotX, dotY, 8, 0, Math.PI * 2);
+  ctx.fillStyle = dotColor + "33"; ctx.fill();
+  ctx.beginPath(); ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
+  ctx.fillStyle = dotColor; ctx.fill();
 
-  // Labels
   ctx.font = "bold 12px system-ui";
   ctx.textAlign = "left";
   const labelX = Math.min(dotX + 10, W - 90);
   const labelY = Math.max(dotY - 10, PAD.top + 14);
-
   ctx.fillStyle = diverged ? "#f85149" : "#e6edf3";
   ctx.fillText(`w = ${state.w.toFixed(3)}`, labelX, labelY);
   ctx.fillStyle = "#8b949e";
@@ -175,40 +151,26 @@ function updateStatePanel() {
   document.getElementById("val-accum").textContent = state.accumulatedGrad.toFixed(4);
   document.getElementById("val-lr").textContent = state.lr.toFixed(3);
   document.getElementById("val-steps").textContent = state.stepCount;
-
   if (state.optimizer === "momentum") {
     document.getElementById("val-velocity").textContent = state.velocity.toFixed(4);
   }
   if (state.optimizer === "adam") {
-    const mHat = state.adamT > 0
-      ? state.adamM / (1 - state.beta1 ** state.adamT)
-      : 0;
-    const vHat = state.adamT > 0
-      ? state.adamV / (1 - state.beta2 ** state.adamT)
-      : 0;
+    const mHat = state.adamT > 0 ? state.adamM / (1 - state.beta1 ** state.adamT) : 0;
+    const vHat = state.adamT > 0 ? state.adamV / (1 - state.beta2 ** state.adamT) : 0;
     document.getElementById("val-adam-m").textContent = mHat.toFixed(4);
     document.getElementById("val-adam-v").textContent = vHat.toFixed(6);
   }
 }
 
 function highlightLine(n) {
-  for (let i = 0; i <= 5; i++) {
+  for (let i = 0; i <= 5; i++)
     document.getElementById(`line-${i}`).classList.remove("active-line");
-  }
-  if (n !== null) {
+  if (n !== null)
     document.getElementById(`line-${n}`).classList.add("active-line");
-  }
 }
 
-const LINE_HINTS = {
-  1: "Clearing accumulated gradients from previous iteration.",
-  4: "Computing gradient: ∂loss/∂w = 2(w − target)",
-  5: "Updating parameter using optimizer rule."
-};
-
-function setHint(lineIdx) {
-  const el = document.getElementById("line-explanation");
-  el.textContent = LINE_HINTS[lineIdx] || "";
+function setHint(text) {
+  document.getElementById("line-explanation").textContent = text || "";
 }
 
 function render() {
@@ -216,30 +178,82 @@ function render() {
   updateStatePanel();
 }
 
+// — Explainer content —
+
+const ZEROG_CONTENT = {
+  on: `<div class="explainer-title">✓ zero_grad() is ON</div>
+       <div class="explainer-body">Before each <code>backward()</code>, PyTorch zeroes out the <code>.grad</code> attribute on every parameter. Each update uses only the <em>current</em> step's gradient — stable and correctly scaled.</div>`,
+  off: `<div class="explainer-title">⚠ zero_grad() is OFF</div>
+        <div class="explainer-body">PyTorch <em>adds</em> new gradients on top of existing <code>.grad</code> values — it never clears them unless you do. After N steps, the accumulated gradient is roughly N× larger than intended. Updates grow explosively. This is the most common training bug in PyTorch.</div>`
+};
+
+const OPT_CONTENT = {
+  sgd: `<div class="explainer-title">SGD — Stochastic Gradient Descent</div>
+        <div class="explainer-formula">w = w − lr × grad</div>
+        <div class="explainer-body">Takes a direct step opposite the gradient. No memory of past steps — each update depends only on the current gradient. Simple and predictable, but sensitive to learning rate choice.</div>`,
+  momentum: `<div class="explainer-title">SGD + Momentum</div>
+             <div class="explainer-formula">v = β·v + grad &nbsp;&nbsp; w = w − lr·v</div>
+             <div class="explainer-body">Maintains a velocity <em>v</em> that accumulates past gradients. With β=0.9, each step carries 90% of prior velocity — like a ball rolling downhill. Passes flat regions faster and dampens oscillation from large LR.</div>`,
+  adam: `<div class="explainer-title">Adam — Adaptive Moment Estimation</div>
+         <div class="explainer-formula">m̂ = m/(1−β₁ᵗ) &nbsp; v̂ = v/(1−β₂ᵗ) &nbsp; w = w − lr·m̂/(√v̂+ε)</div>
+         <div class="explainer-body">Tracks gradient mean <em>m</em> and variance <em>v</em>. Divides by √v̂ so large or noisy gradients get automatically smaller steps — self-normalizing. Bias correction (1−βᵗ) prevents under-estimation at early steps. Usually needs less LR tuning than SGD.</div>`
+};
+
+function updateZerogExplainer() {
+  const el = document.getElementById("zerog-explainer");
+  el.innerHTML = state.useZeroGrad ? ZEROG_CONTENT.on : ZEROG_CONTENT.off;
+  el.className = `explainer ${state.useZeroGrad ? "explainer-ok" : "explainer-warn"}`;
+}
+
+function updateOptExplainer() {
+  document.getElementById("opt-explainer").innerHTML = OPT_CONTENT[state.optimizer];
+}
+
+function updateLrHint(lr) {
+  let text;
+  if (lr < 0.05)      text = "Very small — converges very slowly, many steps needed.";
+  else if (lr < 0.2)  text = "Good — balanced speed and stability.";
+  else if (lr < 0.5)  text = "Moderate — may oscillate slightly near the minimum.";
+  else if (lr < 0.8)  text = "Large — likely to overshoot and bounce around.";
+  else                text = "⚠ Very large — expect divergence, especially with zero_grad OFF.";
+  document.getElementById("lr-hint").textContent = text;
+}
+
+// — Training step —
+
 function trainingStep() {
   if (stepping) return;
   stepping = true;
 
   // Phase 1: zero_grad
+  const oldAccum = state.accumulatedGrad;
   highlightLine(1);
-  setHint(1);
   if (state.useZeroGrad) {
     state.accumulatedGrad = 0;
+    setHint(`zero_grad(): cleared accumulated gradient (${oldAccum.toFixed(3)} → 0)`);
+  } else {
+    setHint(`zero_grad() skipped — accumulated gradient stays at ${oldAccum.toFixed(3)}`);
   }
   render();
 
   setTimeout(() => {
     // Phase 2: backward
     highlightLine(4);
-    setHint(4);
     state.grad = gradVal(state.w);
+    const prevAccum = state.accumulatedGrad;
     state.accumulatedGrad += state.grad;
+    setHint(
+      `backward(): grad = 2×(${state.w.toFixed(2)}−${state.target}) = ${state.grad.toFixed(3)}` +
+      (state.useZeroGrad
+        ? `, accumulated = ${state.accumulatedGrad.toFixed(3)}`
+        : `, accumulated: ${prevAccum.toFixed(3)} + ${state.grad.toFixed(3)} = ${state.accumulatedGrad.toFixed(3)}`)
+    );
     render();
 
     setTimeout(() => {
       // Phase 3: step
       highlightLine(5);
-      setHint(5);
+      const wBefore = state.w;
 
       if (state.optimizer === "sgd") {
         state.w -= state.lr * state.accumulatedGrad;
@@ -255,6 +269,8 @@ function trainingStep() {
         state.w -= state.lr * mHat / (Math.sqrt(vHat) + state.epsilon);
       }
 
+      const delta = state.w - wBefore;
+      setHint(`step(): w ${wBefore.toFixed(3)} → ${state.w.toFixed(3)} (Δw = ${delta > 0 ? "+" : ""}${delta.toFixed(3)})`);
       state.stepCount += 1;
       render();
 
@@ -262,9 +278,9 @@ function trainingStep() {
         highlightLine(null);
         setHint(null);
         stepping = false;
-      }, 350);
-    }, 420);
-  }, 420);
+      }, 400);
+    }, 450);
+  }, 450);
 }
 
 function resetState() {
@@ -286,12 +302,6 @@ function updateOptimizerRows() {
   document.getElementById("row-adam-v").classList.toggle("hidden", state.optimizer !== "adam");
 }
 
-const OPT_DESC = {
-  sgd: "<strong>SGD:</strong> w = w − lr × grad",
-  momentum: "<strong>SGD + Momentum:</strong> v = β·v + grad &nbsp;|&nbsp; w = w − lr·v",
-  adam: "<strong>Adam:</strong> m̂ = m/(1−β₁ᵗ) &nbsp;|&nbsp; v̂ = v/(1−β₂ᵗ) &nbsp;|&nbsp; w = w − lr·m̂/(√v̂+ε)"
-};
-
 // — Event listeners —
 
 document.getElementById("btn-step").addEventListener("click", trainingStep);
@@ -302,7 +312,7 @@ document.getElementById("btn-auto").addEventListener("click", () => {
     autoInterval = null;
     document.getElementById("btn-auto").textContent = "Auto Run";
   } else {
-    autoInterval = setInterval(trainingStep, 1300);
+    autoInterval = setInterval(trainingStep, 1350);
     document.getElementById("btn-auto").textContent = "Pause";
   }
 });
@@ -312,22 +322,16 @@ document.getElementById("btn-reset").addEventListener("click", resetState);
 document.getElementById("toggle-zerog").addEventListener("click", () => {
   state.useZeroGrad = !state.useZeroGrad;
   const btn = document.getElementById("toggle-zerog");
-  const hint = document.getElementById("zerog-hint");
-  if (state.useZeroGrad) {
-    btn.textContent = "zero_grad(): ON";
-    btn.className = "toggle-on";
-    hint.textContent = "Gradients are cleared before each backward pass.";
-  } else {
-    btn.textContent = "zero_grad(): OFF";
-    btn.className = "toggle-off";
-    hint.textContent = "⚠ Gradients accumulate — updates will grow unstable!";
-  }
+  btn.textContent = state.useZeroGrad ? "zero_grad(): ON" : "zero_grad(): OFF";
+  btn.className = state.useZeroGrad ? "toggle-on" : "toggle-off";
+  updateZerogExplainer();
 });
 
 document.getElementById("slider-lr").addEventListener("input", (e) => {
   state.lr = parseFloat(e.target.value);
   document.getElementById("lr-display").textContent = state.lr.toFixed(2);
   document.getElementById("val-lr").textContent = state.lr.toFixed(3);
+  updateLrHint(state.lr);
 });
 
 document.getElementById("select-optimizer").addEventListener("change", (e) => {
@@ -335,10 +339,13 @@ document.getElementById("select-optimizer").addEventListener("change", (e) => {
   state.velocity = 0;
   state.adamM = 0; state.adamV = 0; state.adamT = 0;
   updateOptimizerRows();
-  document.getElementById("opt-desc").innerHTML = OPT_DESC[state.optimizer];
+  updateOptExplainer();
   render();
 });
 
-// Init
+// — Init —
 updateOptimizerRows();
+updateZerogExplainer();
+updateOptExplainer();
+updateLrHint(state.lr);
 render();

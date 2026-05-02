@@ -222,19 +222,55 @@ select {
   cursor: pointer;
 }
 
-.optimizer-desc {
+.explainer {
   width: 100%;
-  font-size: 0.78rem;
-  color: var(--muted);
-  font-family: 'SFMono-Regular', Consolas, monospace;
   background: #0d1117;
-  padding: 0.5rem 0.7rem;
-  border-radius: 5px;
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  line-height: 1.6;
+  border-radius: 5px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.8rem;
+  line-height: 1.55;
 }
 
-.optimizer-desc strong { color: var(--accent); }
+.explainer-ok  { border-left-color: var(--green); }
+.explainer-warn { border-left-color: var(--red); background: #1a0d0d; }
+
+.explainer-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin-bottom: 0.3rem;
+}
+.explainer-ok  .explainer-title { color: var(--green); }
+.explainer-warn .explainer-title { color: var(--red); }
+.explainer       .explainer-title { color: var(--accent); }
+
+.explainer-formula {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--accent);
+  background: #161b22;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.35rem;
+  display: inline-block;
+}
+
+.explainer-body {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.explainer-body code {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  background: #21262d;
+  padding: 0.05em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
+  color: #c9d1d9;
+}
+
+.explainer-body em { color: #c9d1d9; font-style: italic; }
 
 @media (max-width: 680px) {
   main { grid-template-columns: 1fr; }

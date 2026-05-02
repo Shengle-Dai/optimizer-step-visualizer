@@ -57,12 +57,13 @@
 
       <div class="control-group">
         <button id="toggle-zerog" class="toggle-on">zero_grad(): ON</button>
-        <p class="hint" id="zerog-hint">Gradients are cleared before each backward pass.</p>
+        <div class="explainer explainer-ok" id="zerog-explainer"></div>
       </div>
 
       <div class="control-group">
         <label for="slider-lr">Learning Rate: <strong id="lr-display">0.10</strong></label>
         <input type="range" id="slider-lr" min="0.01" max="1.0" step="0.01" value="0.1">
+        <p class="hint" id="lr-hint"></p>
       </div>
 
       <div class="control-group">
@@ -72,10 +73,7 @@
           <option value="momentum">SGD + Momentum</option>
           <option value="adam">Adam</option>
         </select>
-      </div>
-
-      <div class="optimizer-desc" id="opt-desc">
-        <strong>SGD:</strong> w = w − lr × grad
+        <div class="explainer" id="opt-explainer"></div>
       </div>
     </section>
   </main>

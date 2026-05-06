@@ -86,9 +86,12 @@ let speedMs = 600;
 // ---------- DOM refs ----------
 
 const $ = (id) => document.getElementById(id);
-const presetGrid     = $("presetGrid");
-const customInput    = $("customInput");
-const loadBtn        = $("loadSentenceBtn");
+const presetGrid       = $("presetGrid");
+const customInput      = $("customInput");
+const loadBtn          = $("loadSentenceBtn");
+const setupCard        = $("setupCard");
+const setupExpandBtn   = $("setupExpandBtn");
+const loadedSentenceEl = $("loadedSentenceText");
 const tokenTimeline  = $("tokenTimeline");
 const stepCounter    = $("stepCounter");
 const lstmDiagram    = $("lstmDiagram");
@@ -579,6 +582,8 @@ async function stepForward() {
   // If user sub-phased into the current token, finish it silently before crossing.
   completeRemainingPhasesSilently();
 
+  if (state.currentStep === -1) collapseSetup();
+
   history.push(deepClone(state));
   state.currentStep += 1;
   state.subPhase = -1;
@@ -634,6 +639,7 @@ async function stepPhase() {
   const startNewToken = state.currentStep === -1 || state.subPhase === 3;
 
   if (startNewToken) {
+    if (state.currentStep === -1) collapseSetup();
     history.push(deepClone(state));
     state.currentStep += 1;
     state.subPhase = -1;
@@ -705,6 +711,7 @@ function resetState() {
   state = initialState();
   state.tokens = tokens;
   render();
+  expandSetup();
   stepExplanation.innerHTML = `Click <strong>Start ▶</strong> for a full token, or <strong>▶ 1. Compute gates</strong> to step through one phase at a time.`;
 }
 
@@ -715,9 +722,18 @@ function loadSentence(s) {
   state.tokens = tokenize(s);
   buildDiagram();
   render();
+  if (loadedSentenceEl) loadedSentenceEl.textContent = s;
+  expandSetup(); // any new sentence resets the setup card to expanded
   stepExplanation.innerHTML = `Loaded a sentence with ${state.tokens.length} tokens.<br>
 Click <strong>Start ▶</strong> to advance one full token (computes all four phases at once and plays the full animation).<br>
 Or click <strong>▶ 1. Compute gates</strong> to step through one phase at a time and read what each phase does.`;
+}
+
+function collapseSetup() {
+  if (setupCard) setupCard.classList.add("collapsed");
+}
+function expandSetup() {
+  if (setupCard) setupCard.classList.remove("collapsed");
 }
 
 // ============================================================
@@ -1328,6 +1344,8 @@ nextBtn.addEventListener("click", stepForward);
 phaseBtn.addEventListener("click", stepPhase);
 prevBtn.addEventListener("click", stepBackward);
 resetBtn.addEventListener("click", resetState);
+
+if (setupExpandBtn) setupExpandBtn.addEventListener("click", expandSetup);
 
 autoBtn.addEventListener("click", () => {
   if (autoTimer) stopAuto();

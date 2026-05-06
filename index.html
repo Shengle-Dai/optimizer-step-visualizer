@@ -11,25 +11,31 @@
   <main class="app">
     <header class="hero">
       <h1>Watch an LSTM Remember</h1>
-      <p class="hero-task"><strong>Task:</strong> read a sentence one word at a time and predict whether it's <span class="cl-positive">positive</span> or <span class="cl-negative">negative</span> (binary sentiment classification).</p>
-      <p>Step through and see how the gates decide what to <span class="cl-forget">forget</span>, what to <span class="cl-input">store</span>, and what to <span class="cl-output">output</span>.</p>
+      <p class="hero-task"><strong>Task:</strong> read a sentence word-by-word and predict <span class="cl-positive">positive</span> vs. <span class="cl-negative">negative</span> sentiment, watching the gates <span class="cl-forget">forget</span>, <span class="cl-input">store</span>, and <span class="cl-output">output</span> at each step.</p>
     </header>
 
-    <section class="card setup-card">
-      <div class="setup-head">
-        <h2>1. Pick an example sentence</h2>
-        <span class="setup-sub">Each illustrates a different LSTM behavior. Start with the recommended one.</span>
+    <section class="card setup-card" id="setupCard">
+      <div class="setup-loaded-bar">
+        <span class="setup-loaded-label">1. Sentence:</span>
+        <code id="loadedSentenceText">—</code>
+        <button id="setupExpandBtn" type="button" class="setup-change-btn">Change ▼</button>
       </div>
-      <div id="presetGrid" class="preset-grid"></div>
-
-      <details class="custom-details">
-        <summary><span class="custom-summary-text">Or try your own sentence</span></summary>
-        <div class="custom-row">
-          <input id="customInput" type="text" placeholder="Type a short sentence and press Enter…">
-          <button id="loadSentenceBtn" class="primary">Load</button>
+      <div class="setup-body">
+        <div class="setup-head">
+          <h2>1. Pick an example sentence</h2>
+          <span class="setup-sub">Each illustrates a different LSTM behavior. Start with the recommended one.</span>
         </div>
-        <p class="setup-hint">Recognizes a small lexicon (~40 sentiment words plus negation/contrast cues like &ldquo;not&rdquo;, &ldquo;but&rdquo;). Other words are treated as neutral. Recognized words are color-tinted in the timeline below.</p>
-      </details>
+        <div id="presetGrid" class="preset-grid"></div>
+
+        <details class="custom-details">
+          <summary><span class="custom-summary-text">Or try your own sentence</span></summary>
+          <div class="custom-row">
+            <input id="customInput" type="text" placeholder="Type a short sentence and press Enter…">
+            <button id="loadSentenceBtn" class="primary">Load</button>
+          </div>
+          <p class="setup-hint">Recognizes a small lexicon (~40 sentiment words plus negation/contrast cues like &ldquo;not&rdquo;, &ldquo;but&rdquo;). Other words are treated as neutral. Recognized words are color-tinted in the timeline below.</p>
+        </details>
+      </div>
     </section>
 
     <section class="card navigator-card">

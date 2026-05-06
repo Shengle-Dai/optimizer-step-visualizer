@@ -29,35 +29,64 @@ const contrastWords = new Set([
 // ---------- Presets ----------
 
 const PRESETS = [
-  "The movie was wonderful.",
-  "The movie was terrible.",
-  "The movie was not bad.",
-  "Although the beginning was slow, the ending was amazing.",
-  "The acting was great, but the story was boring."
+  {
+    text:    "The movie was not bad.",
+    label:   "Negation flip",
+    teaches: "Memory rewrites interpretation: 'not' + 'bad' → positive.",
+    recommended: true
+  },
+  {
+    text:    "The movie was wonderful.",
+    label:   "Simple positive",
+    teaches: "Positive evidence accumulates without surprises."
+  },
+  {
+    text:    "The movie was terrible.",
+    label:   "Simple negative",
+    teaches: "Negative evidence accumulates without surprises."
+  },
+  {
+    text:    "Although the beginning was slow, the ending was amazing.",
+    label:   "Long-range contrast",
+    teaches: "Contrast cue lets later evidence dominate the prediction."
+  },
+  {
+    text:    "The acting was great, but the story was boring.",
+    label:   "Mixed sentiment",
+    teaches: "'But' downweights earlier sentiment; the second clause flips the verdict."
+  }
 ];
 
-const DEFAULT_PRESET = 2; // "not bad" — the central case
+const DEFAULT_PRESET = 0; // "not bad" — the central case (now first in the array)
 
 // ---------- State ----------
 
 const initialState = () => ({
   tokens: [],
   currentStep: -1,
+  subPhase: -1,  // -1 = nothing done for currentStep; 0..3 = sub-phase just completed
   cellState:   { positive: 0, negative: 0, negation: 0, contrast: 0 },
   hiddenState: { positiveSignal: 0, negativeSignal: 0 },
   gates:       { forget: 0, input: 0, candidate: 0, output: 0 },
-  sentiment:   { positiveProb: 0.5, negativeProb: 0.5, label: "Neutral" }
+  sentiment:   { positiveProb: 0.5, negativeProb: 0.5, label: "Uncertain" }
 });
+
+const PHASE_NAMES = [
+  "Compute gates",
+  "Forget existing",
+  "Learn new content",
+  "Output & predict"
+];
 
 let state = initialState();
 let history = [];
 let autoTimer = null;
-let speedMs = 900;
+let speedMs = 600;
 
 // ---------- DOM refs ----------
 
 const $ = (id) => document.getElementById(id);
-const presetSelect   = $("presetSelect");
+const presetGrid     = $("presetGrid");
 const customInput    = $("customInput");
 const loadBtn        = $("loadSentenceBtn");
 const tokenTimeline  = $("tokenTimeline");
@@ -70,6 +99,7 @@ const sentimentBars  = $("sentimentBars");
 const sentimentLabel = $("sentimentLabel");
 const stepExplanation= $("stepExplanation");
 const prevBtn        = $("prevBtn");
+const phaseBtn       = $("phaseBtn");
 const nextBtn        = $("nextBtn");
 const autoBtn        = $("autoBtn");
 const resetBtn       = $("resetBtn");
@@ -176,7 +206,35 @@ function computeSentiment() {
   state.sentiment.negativeProb = negativeProb;
   if      (positiveProb > 0.6) state.sentiment.label = "Positive";
   else if (negativeProb > 0.6) state.sentiment.label = "Negative";
-  else                          state.sentiment.label = "Neutral";
+  else                          state.sentiment.label = "Uncertain";
+}
+
+// ============================================================
+// Sub-phase wrappers — each applies one phase of the LSTM update
+// ============================================================
+
+function phaseCompute(token, type) {
+  state._negationWasActive = state.cellState.negation > 0.4;
+  state.gates = {
+    forget:    computeForgetGate(type),
+    input:     computeInputGate(type),
+    candidate: computeCandidate(token, type),
+    output:    computeOutputGate(type)
+  };
+}
+
+function phaseForget() {
+  applyForgetGate(state.gates.forget);
+}
+
+function phaseLearn(type) {
+  applyInputGate(state.gates.input, state.gates.candidate, type);
+  decayNegation(type);
+}
+
+function phaseOutput() {
+  computeHiddenState(state.gates.output);
+  computeSentiment();
 }
 
 // ============================================================
@@ -206,7 +264,7 @@ function generateExplanation(token, type) {
   }
 
   if (type === "negation") {
-    return `${tok} is a <strong class="warn">negation cue</strong>. The LSTM stores it in a dedicated <em>negation</em> memory slot. The <span class="cl-output">output gate</span> dips (~0.35) — the model isn't ready to commit to sentiment until it sees what is being negated.`;
+    return `${tok} is a <strong class="warn">negation cue</strong>. The LSTM stores it in a dedicated <em>negation</em> memory slot. The <span class="cl-output">output gate</span> dips (~0.35) — the model isn't ready to commit to sentiment until it sees what is being negated. <strong class="flip">Watch the next sentiment word: its interpretation will flip.</strong>`;
   }
 
   if (type === "contrast") {
@@ -214,6 +272,66 @@ function generateExplanation(token, type) {
   }
 
   return "";
+}
+
+// Phase-by-phase explanation: what just happened in this sub-step.
+function generatePhaseExplanation(phase, token, type) {
+  const tok = `<code>${token}</code>`;
+  const g = state.gates;
+  const fNum = g.forget.toFixed(2);
+  const iNum = g.input.toFixed(2);
+  const cNum = g.candidate >= 0 ? `+${g.candidate.toFixed(2)}` : g.candidate.toFixed(2);
+  const oNum = g.output.toFixed(2);
+
+  if (phase === 0) {
+    let typeNote = "";
+    if (type === "negation")  typeNote = ` It's a <strong class="warn">negation cue</strong>, so the input gate is high but the candidate has no sentiment content (it'll be stored in the dedicated negation channel instead).`;
+    else if (type === "contrast") typeNote = ` It's a <strong>contrast cue</strong>, so the forget gate drops sharply — old sentiment is about to get partially wiped.`;
+    else if (type === "positive") typeNote = ` It's a <strong style="color:var(--positive);">positive</strong> sentiment word, so the candidate is +1 and the input gate is high.`;
+    else if (type === "negative") typeNote = ` It's a <strong style="color:var(--negative);">negative</strong> sentiment word, so the candidate is −1 and the input gate is high.`;
+    else typeNote = ` It carries little sentiment, so the input gate stays low — almost nothing new will be written.`;
+    return `<strong>Phase 1 of 4: Compute gates.</strong><br>
+The cell reads ${tok} together with the previous hidden state h<sub>t-1</sub> and computes all four gate values:
+<span class="cl-forget">forget</span> = ${fNum}, <span class="cl-input">input</span> = ${iNum}, candidate = ${cNum}, <span class="cl-output">output</span> = ${oNum}.
+${typeNote} <em>No memory has changed yet</em> — these values just describe what the cell is <em>about</em> to do.`;
+  }
+
+  if (phase === 1) {
+    const pct = Math.round((1 - g.forget) * 100);
+    const note = g.forget >= 0.7
+      ? `Old memory is mostly preserved — only ${pct}% gets wiped this step.`
+      : `A large slice (${pct}%) of old memory is wiped this step. This is what happens on contrast cues like "but" — the LSTM lets later evidence dominate.`;
+    return `<strong>Phase 2 of 4: Forget existing memory.</strong><br>
+Multiply every cell-state channel by the <span class="cl-forget">forget gate</span> (${fNum}). This is the <code>f<sub>t</sub> · c<sub>t-1</sub></code> term in <code>c<sub>t</sub> = f<sub>t</sub>·c<sub>t-1</sub> + i<sub>t</sub>·g<sub>t</sub></code>.
+${note}`;
+  }
+
+  if (phase === 2) {
+    const learn = generateExplanation(token, type);
+    return `<strong>Phase 3 of 4: Learn new content.</strong><br>
+The <span class="cl-input">input gate</span> (${iNum}) decides how much of the candidate (${cNum}) lands in memory — this is the <code>i<sub>t</sub>·g<sub>t</sub></code> term that gets <em>added</em> to the (already-forgotten) cell state.<br>
+${learn}`;
+  }
+
+  if (phase === 3) {
+    const pos = (state.sentiment.positiveProb * 100).toFixed(0);
+    const neg = (state.sentiment.negativeProb * 100).toFixed(0);
+    const labelColor = state.sentiment.label === "Positive" ? "var(--positive)"
+                     : state.sentiment.label === "Negative" ? "var(--negative)"
+                     : "var(--muted)";
+    const outputNote = g.output < 0.4
+      ? `The output gate is <em>low</em> (${oNum}) — the cell is holding back, signalling that it isn't ready to commit yet (typical right after a negation cue).`
+      : `The output gate is open (${oNum}), so the cell reveals its current memory confidently.`;
+    return `<strong>Phase 4 of 4: Output &amp; predict.</strong><br>
+Compute the hidden state <code>h<sub>t</sub> = o<sub>t</sub> · tanh(c<sub>t</sub>)</code>. ${outputNote}
+The classifier softmaxes the positive vs. negative hidden-state signals → <strong style="color:${labelColor};">${state.sentiment.label}</strong> (${pos}% / ${neg}%).`;
+  }
+
+  return "";
+}
+
+function renderPhaseExplanation(phase, token, type) {
+  stepExplanation.innerHTML = generatePhaseExplanation(phase, token, type);
 }
 
 function generateMemorySummary() {
@@ -379,30 +497,100 @@ async function animateStep(idx) {
   flashElement(cell, "ht-bubble", T(400));
 }
 
+// ---------- Sub-phase animation (shorter, only the relevant segment) ----------
+
+async function animateSubPhase(cell, phase) {
+  if (!cell) return;
+  const sf = Math.max(0.33, speedMs / 900);
+  const T = (ms) => Math.max(40, ms * sf);
+
+  if (phase === 0) {
+    // Read input + compute gates
+    ["forget","input","candidate","output"].forEach(k => {
+      const lbl = cell.querySelector(`[data-val="${k}"]`);
+      if (lbl) lbl.textContent = "0.00";
+    });
+    await Promise.all([
+      pulseAlongPath(cell, "x-riser",  T(420), "#2563eb"),
+      pulseAlongPath(cell, "h-bus-in", T(420), "#7c3aed")
+    ]);
+    await pulseAlongPath(cell, "bus-spine", T(320), "#1f2937");
+    await Promise.all([
+      pulseAlongPath(cell, "riser-forget",    T(180), "#ca8a04"),
+      pulseAlongPath(cell, "riser-input",     T(180), "#ca8a04"),
+      pulseAlongPath(cell, "riser-candidate", T(180), "#ca8a04"),
+      pulseAlongPath(cell, "riser-output",    T(180), "#ca8a04")
+    ]);
+    await Promise.all([
+      flashAndCountUp(cell, "forget",    state.gates.forget,    T(450)),
+      flashAndCountUp(cell, "input",     state.gates.input,     T(450)),
+      flashAndCountUp(cell, "candidate", state.gates.candidate, T(450)),
+      flashAndCountUp(cell, "output",    state.gates.output,    T(450))
+    ]);
+  } else if (phase === 1) {
+    // Forget: forget gate flows up to the × on the cell-state wire
+    await pulseAlongPath(cell, "forget-up", T(320), "#ef4444");
+    flashElement(cell, "forget-times", T(380));
+  } else if (phase === 2) {
+    // Learn: input + candidate combine at × → +
+    await Promise.all([
+      pulseAlongPath(cell, "input-up",     T(340), "#22c55e"),
+      pulseAlongPath(cell, "candidate-up", T(340), "#a855f7")
+    ]);
+    flashElement(cell, "input-times", T(320));
+    await pulseAlongPath(cell, "input-to-plus", T(260), "#22c55e");
+    flashElement(cell, "plus-node", T(320));
+    await pulseAlongPath(cell, "cellstate-out", T(380), "#0f172a");
+  } else if (phase === 3) {
+    // Output: cell-state → tanh → output × → h_t
+    await pulseAlongPath(cell, "cellstate-down", T(280), "#0f172a");
+    flashElement(cell, "tanh-ellipse", T(320));
+    await pulseAlongPath(cell, "tanh-to-ox", T(260), "#dc2626");
+    await pulseAlongPath(cell, "output-up", T(340), "#eab308");
+    flashElement(cell, "output-times", T(320));
+    await Promise.all([
+      pulseAlongPath(cell, "ht-up",    T(340), "#7c3aed"),
+      pulseAlongPath(cell, "ht-right", T(340), "#7c3aed")
+    ]);
+    flashElement(cell, "ht-bubble", T(420));
+  }
+}
+
 // ---------- Step controls ----------
+
+// Apply remaining sub-phases of the current token silently (no animation).
+// Used when the user clicks "Next token" while mid-phase.
+function completeRemainingPhasesSilently() {
+  if (state.currentStep < 0 || state.subPhase === 3) return;
+  const token = state.tokens[state.currentStep];
+  const type  = classifyToken(token);
+  if (state.subPhase < 0) phaseCompute(token, type);
+  if (state.subPhase < 1) phaseForget();
+  if (state.subPhase < 2) phaseLearn(type);
+  if (state.subPhase < 3) phaseOutput();
+  state.subPhase = 3;
+}
 
 async function stepForward() {
   if (animLock) return;
-  if (state.currentStep >= state.tokens.length - 1) return;
+  if (state.currentStep >= state.tokens.length - 1 && state.subPhase === 3) return;
   animLock = true;
+
+  // If user sub-phased into the current token, finish it silently before crossing.
+  completeRemainingPhasesSilently();
 
   history.push(deepClone(state));
   state.currentStep += 1;
+  state.subPhase = -1;
   const token = state.tokens[state.currentStep];
   const type  = classifyToken(token);
-  state._negationWasActive = state.cellState.negation > 0.4;
 
-  const f = computeForgetGate(type);
-  const i = computeInputGate(type);
-  const c = computeCandidate(token, type);
-  const o = computeOutputGate(type);
-  state.gates = { forget: f, input: i, candidate: c, output: o };
-
-  applyForgetGate(f);
-  applyInputGate(i, c, type);
-  decayNegation(type);
-  computeHiddenState(o);
-  computeSentiment();
+  // Apply all four phases for the new token
+  phaseCompute(token, type);
+  phaseForget();
+  phaseLearn(type);
+  phaseOutput();
+  state.subPhase = 3;
 
   // 1) Slide the diagram + update active/faded classes
   const idx = state.currentStep;
@@ -435,6 +623,69 @@ async function stepForward() {
   updateButtons();
 }
 
+// Advance one sub-phase. If currently at end-of-token (subPhase === 3) or
+// before-start (currentStep === -1), this crosses the token boundary into
+// the new token's phase 0.
+async function stepPhase() {
+  if (animLock) return;
+  if (state.currentStep >= state.tokens.length - 1 && state.subPhase === 3) return;
+  animLock = true;
+
+  const startNewToken = state.currentStep === -1 || state.subPhase === 3;
+
+  if (startNewToken) {
+    history.push(deepClone(state));
+    state.currentStep += 1;
+    state.subPhase = -1;
+
+    // Slide diagram to new cell and update active/faded
+    const idx = state.currentStep;
+    const tx = (VIEW_W - CELL_W) / 2 - idx * CELL_W;
+    const roll = document.getElementById("lstmRoll");
+    if (roll) roll.style.transform = `translateX(${tx}px)`;
+    cellGroups.forEach((cg, j) => {
+      cg.classList.toggle("active", j === idx);
+      cg.classList.toggle("faded",  j !== idx);
+    });
+    renderTimeline();
+    updateStepCounter();
+    updateButtons();
+    await new Promise(r => setTimeout(r, 720));
+  }
+
+  const idx = state.currentStep;
+  const token = state.tokens[idx];
+  const type = classifyToken(token);
+  const nextPhase = state.subPhase + 1; // 0..3
+
+  // Apply this phase's math
+  if (nextPhase === 0) phaseCompute(token, type);
+  else if (nextPhase === 1) phaseForget();
+  else if (nextPhase === 2) phaseLearn(type);
+  else if (nextPhase === 3) phaseOutput();
+
+  state.subPhase = nextPhase;
+
+  // Render side panels immediately
+  renderTimeline();
+  renderGates();
+  renderMemory();
+  renderSentiment();
+  renderPhaseExplanation(nextPhase, token, type);
+  updateStepCounter();
+  updateButtons();
+
+  // Brief sub-phase animation
+  await animateSubPhase(cellGroups[idx], nextPhase);
+
+  if (state.currentStep === state.tokens.length - 1 && state.subPhase === 3) {
+    stepExplanation.innerHTML += `<br><br>${finalSummary()}`;
+  }
+
+  animLock = false;
+  updateButtons();
+}
+
 function stepBackward() {
   if (history.length === 0) return;
   if (animLock) {
@@ -454,7 +705,7 @@ function resetState() {
   state = initialState();
   state.tokens = tokens;
   render();
-  stepExplanation.innerHTML = `Click <strong>Next</strong> to start reading the sentence.`;
+  stepExplanation.innerHTML = `Click <strong>Start ▶</strong> for a full token, or <strong>▶ 1. Compute gates</strong> to step through one phase at a time.`;
 }
 
 function loadSentence(s) {
@@ -464,7 +715,9 @@ function loadSentence(s) {
   state.tokens = tokenize(s);
   buildDiagram();
   render();
-  stepExplanation.innerHTML = `Loaded sentence with ${state.tokens.length} tokens. Click <strong>Next</strong> to begin.`;
+  stepExplanation.innerHTML = `Loaded a sentence with ${state.tokens.length} tokens.<br>
+Click <strong>Start ▶</strong> to advance one full token (computes all four phases at once and plays the full animation).<br>
+Or click <strong>▶ 1. Compute gates</strong> to step through one phase at a time and read what each phase does.`;
 }
 
 // ============================================================
@@ -521,13 +774,31 @@ function updateStepCounter() {
     stepCounter.textContent = `Step 0 of ${state.tokens.length}`;
   } else {
     const tok = state.tokens[state.currentStep];
-    stepCounter.textContent = `Step ${state.currentStep + 1} of ${state.tokens.length} — "${tok}"`;
+    const phaseHint = (state.subPhase >= 0 && state.subPhase < 3)
+      ? ` · phase ${state.subPhase + 1}/4: ${PHASE_NAMES[state.subPhase]}`
+      : "";
+    stepCounter.textContent = `Step ${state.currentStep + 1} of ${state.tokens.length} — "${tok}"${phaseHint}`;
   }
 }
 
 function updateButtons() {
   prevBtn.disabled = history.length === 0;
-  nextBtn.disabled = state.currentStep >= state.tokens.length - 1;
+
+  const atVeryEnd = state.currentStep >= state.tokens.length - 1 && state.subPhase === 3;
+  nextBtn.disabled  = atVeryEnd;
+  phaseBtn.disabled = atVeryEnd;
+
+  // Full-step button label
+  nextBtn.textContent = state.currentStep < 0 ? "Start ▶" : "Next token ▶";
+
+  // Phase button: label always names the *next* phase to be applied
+  let nextPhaseIdx;
+  if (state.currentStep < 0 || state.subPhase === 3) {
+    nextPhaseIdx = 0; // crossing token boundary on next click
+  } else {
+    nextPhaseIdx = state.subPhase + 1;
+  }
+  phaseBtn.textContent = `▶ ${nextPhaseIdx + 1}. ${PHASE_NAMES[nextPhaseIdx]}`;
 }
 
 // ----- Gates -----
@@ -535,29 +806,47 @@ function updateButtons() {
 const GATE_META = [
   { key: "forget",    name: "Forget",    desc: "How much old memory to keep" },
   { key: "input",     name: "Input",     desc: "How much new info to write" },
-  { key: "candidate", name: "Candidate", desc: "Sign of new content (±1)" },
   { key: "output",    name: "Output",    desc: "How much memory to reveal" }
 ];
 
+const CANDIDATE_META = { key: "candidate", name: "Candidate (g<sub>t</sub>)" };
+
+function signedDisplay(v) {
+  if (v > 0)   return `+${v.toFixed(2)}`;
+  if (v < 0)   return `−${Math.abs(v).toFixed(2)}`; // proper minus sign
+  return ` 0.00`;
+}
+
 function renderGates() {
-  gateBars.innerHTML = GATE_META.map(g => {
+  const gateRows = GATE_META.map(g => {
     const v = state.gates[g.key];
-    const isCandidate = g.key === "candidate";
-    const pct = isCandidate ? Math.abs(v) * 50 : v * 100; // candidate is signed [-1,1]
-    const fillClass = isCandidate ? "" : " unsigned";
-    const offset = isCandidate
-      ? (v >= 0 ? `left:50%;` : `right:50%;left:auto;`)
-      : "";
-    const display = v.toFixed(2);
+    const pct = v * 100;
     return `
       <div class="bar-row" data-key="${g.key}" data-tooltip="gate-${g.key}">
         <span class="bar-label">${g.name}</span>
         <div class="bar-track">
-          <div class="bar-fill${fillClass}" style="width:${pct}%; ${offset}"></div>
+          <div class="bar-fill unsigned" style="width:${pct}%;"></div>
         </div>
-        <span class="bar-value">${display}</span>
+        <span class="bar-value">${v.toFixed(2)}</span>
       </div>`;
   }).join("");
+
+  const cv = state.gates.candidate;
+  const cPct = Math.abs(cv) * 50;
+  const cOffset = cv >= 0 ? `left:50%;` : `right:50%;left:auto;`;
+  const candidateRow = `
+    <div class="bar-row candidate-row" data-key="candidate" data-tooltip="gate-candidate">
+      <span class="bar-label">
+        <span class="bar-mainlabel">${CANDIDATE_META.name}</span>
+        <span class="bar-sublabel">new content, not a gate</span>
+      </span>
+      <div class="bar-track signed-track">
+        <div class="bar-fill" style="width:${cPct}%; ${cOffset}"></div>
+      </div>
+      <span class="bar-value">${signedDisplay(cv)}</span>
+    </div>`;
+
+  gateBars.innerHTML = gateRows + candidateRow;
 
   // Wire gate tooltips
   GATE_META.forEach(g => {
@@ -566,12 +855,16 @@ function renderGates() {
       html: `<div class="tt-title">${g.name} gate</div><div class="tt-body">${GATE_TOOLTIPS[g.key]}</div>`
     }));
   });
+  const candRow = gateBars.querySelector(`[data-key="candidate"]`);
+  addTooltip(candRow, () => ({
+    html: `<div class="tt-title">${CANDIDATE_META.name}</div><div class="tt-body">${GATE_TOOLTIPS.candidate}</div>`
+  }));
 }
 
 const GATE_TOOLTIPS = {
   forget:    "Controls how much of the previous cell state survives. High = remember nearly everything; low = wipe most of it. Drops on contrast words like 'but'.",
   input:     "Controls how much new information gets written into the cell state. High on sentiment and negation words; low on neutral filler like 'the'.",
-  candidate: "The new signed content being proposed (+1 for positive words, −1 for negative). The input gate decides how much actually lands in memory.",
+  candidate: "<strong>Not a gate</strong> — this is the <strong>new content</strong> being proposed (+1 for positive words, −1 for negative). The input gate decides how much of it actually lands in memory.",
   output:    "Controls how much of the cell state is revealed as the hidden state used by the classifier. Dips after 'not' because the model isn't yet sure what is being negated."
 };
 
@@ -980,27 +1273,51 @@ function renderMath() {
 // Wiring
 // ============================================================
 
-function init() {
-  // Populate preset dropdown
-  PRESETS.forEach((s, i) => {
-    const opt = document.createElement("option");
-    opt.value = i;
-    opt.textContent = s;
-    presetSelect.appendChild(opt);
-  });
-  presetSelect.value = DEFAULT_PRESET;
+let activePresetIndex = -1; // -1 means custom sentence is loaded
 
-  renderMath();
-  loadSentence(PRESETS[DEFAULT_PRESET]);
+function renderPresets() {
+  presetGrid.innerHTML = PRESETS.map((p, i) => {
+    const cls = [
+      "preset-card",
+      p.recommended ? "recommended" : "",
+      i === activePresetIndex ? "active" : ""
+    ].filter(Boolean).join(" ");
+    const tag = p.recommended ? `<span class="preset-tag">★ Start here</span>` : "";
+    return `
+      <button class="${cls}" data-preset="${i}" type="button">
+        <div class="preset-header">
+          <span class="preset-label">${p.label}</span>
+          ${tag}
+        </div>
+        <div class="preset-text">&ldquo;${p.text}&rdquo;</div>
+        <div class="preset-teaches">${p.teaches}</div>
+      </button>`;
+  }).join("");
+
+  presetGrid.querySelectorAll(".preset-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const i = parseInt(card.dataset.preset);
+      activePresetIndex = i;
+      loadSentence(PRESETS[i].text);
+      renderPresets(); // re-render so active highlight follows
+    });
+  });
 }
 
-presetSelect.addEventListener("change", (e) => {
-  loadSentence(PRESETS[parseInt(e.target.value)]);
-});
+function init() {
+  activePresetIndex = DEFAULT_PRESET;
+  renderPresets();
+  renderMath();
+  loadSentence(PRESETS[DEFAULT_PRESET].text);
+}
 
 loadBtn.addEventListener("click", () => {
   const v = customInput.value.trim();
-  if (v) loadSentence(v);
+  if (v) {
+    activePresetIndex = -1;
+    loadSentence(v);
+    renderPresets();
+  }
 });
 
 customInput.addEventListener("keydown", (e) => {
@@ -1008,6 +1325,7 @@ customInput.addEventListener("keydown", (e) => {
 });
 
 nextBtn.addEventListener("click", stepForward);
+phaseBtn.addEventListener("click", stepPhase);
 prevBtn.addEventListener("click", stepBackward);
 resetBtn.addEventListener("click", resetState);
 

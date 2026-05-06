@@ -11,27 +11,42 @@
   <main class="app">
     <header class="hero">
       <h1>Watch an LSTM Remember</h1>
-      <p>Step through a sentence and see how an LSTM uses gates to decide what to <span class="cl-forget">forget</span>, what to <span class="cl-input">store</span>, and what to <span class="cl-output">output</span>.</p>
+      <p class="hero-task"><strong>Task:</strong> read a sentence one word at a time and predict whether it's <span class="cl-positive">positive</span> or <span class="cl-negative">negative</span> (binary sentiment classification).</p>
+      <p>Step through and see how the gates decide what to <span class="cl-forget">forget</span>, what to <span class="cl-input">store</span>, and what to <span class="cl-output">output</span>.</p>
     </header>
 
     <section class="card setup-card">
-      <div class="setup-row">
-        <label for="presetSelect">Preset:</label>
-        <select id="presetSelect"></select>
+      <div class="setup-head">
+        <h2>1. Pick an example sentence</h2>
+        <span class="setup-sub">Each illustrates a different LSTM behavior. Start with the recommended one.</span>
       </div>
-      <div class="setup-row">
-        <label for="customInput">Custom:</label>
-        <input id="customInput" type="text" placeholder="Type a short sentence and press Enter…">
-        <button id="loadSentenceBtn">Load</button>
-      </div>
+      <div id="presetGrid" class="preset-grid"></div>
+
+      <details class="custom-details">
+        <summary><span class="custom-summary-text">Or try your own sentence</span></summary>
+        <div class="custom-row">
+          <input id="customInput" type="text" placeholder="Type a short sentence and press Enter…">
+          <button id="loadSentenceBtn" class="primary">Load</button>
+        </div>
+        <p class="setup-hint">Recognizes a small lexicon (~40 sentiment words plus negation/contrast cues like &ldquo;not&rdquo;, &ldquo;but&rdquo;). Other words are treated as neutral. Recognized words are color-tinted in the timeline below.</p>
+      </details>
     </section>
 
-    <section class="card timeline-card">
-      <div class="card-head">
-        <h2>Token Timeline</h2>
+    <section class="card navigator-card">
+      <div class="navigator-head">
+        <h2>2. Step through the sentence</h2>
         <span id="stepCounter" class="step-counter">—</span>
       </div>
       <div id="tokenTimeline" class="token-row"></div>
+      <div class="navigator-controls">
+        <button id="prevBtn">◀ Previous</button>
+        <button id="phaseBtn">▶ 1. Compute gates</button>
+        <button id="nextBtn" class="primary">Start ▶</button>
+        <button id="autoBtn">Auto-play</button>
+        <button id="resetBtn">Reset</button>
+        <label class="speed-label" for="speedSlider">Step duration: <strong id="speedDisplay">3.0s/step</strong></label>
+        <input id="speedSlider" type="range" min="300" max="2000" step="100" value="600">
+      </div>
     </section>
 
     <section class="main-grid">
@@ -53,7 +68,8 @@
         </section>
 
         <section class="card sentiment-card">
-          <h2>Sentiment Prediction</h2>
+          <h2>Sentiment Prediction <span class="card-tag">binary</span></h2>
+          <p class="card-caption">Softmax over <span class="cl-positive">positive</span> vs. <span class="cl-negative">negative</span> hidden-state signals. "Uncertain" means neither side crossed 60%.</p>
           <div id="sentimentBars"></div>
           <p id="sentimentLabel" class="sentiment-label">—</p>
         </section>
@@ -63,15 +79,6 @@
     <section class="card explanation-card">
       <h2>What happened at this step?</h2>
       <p id="stepExplanation" class="step-text">Click <strong>Next</strong> to start reading the sentence.</p>
-    </section>
-
-    <section class="card controls-card">
-      <button id="prevBtn">◀ Previous</button>
-      <button id="nextBtn" class="primary">Next ▶</button>
-      <button id="autoBtn">Auto-play</button>
-      <button id="resetBtn">Reset</button>
-      <label class="speed-label" for="speedSlider">Step duration: <strong id="speedDisplay">4.1s/step</strong></label>
-      <input id="speedSlider" type="range" min="300" max="2000" step="100" value="900">
     </section>
 
     <section class="card math-card">

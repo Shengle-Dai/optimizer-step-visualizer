@@ -1093,6 +1093,8 @@ function buildCell(index, xOffset, parent) {
 
   // ---- Forget × on top wire ----
   drawOp(ints, X_F, TOP_Y, "×", "forget-times");
+  // Top cell-state wire entering the forget × from the left (c_{t-1} pathway)
+  el("path", { "class": "wire wire-cell", d: `M ${BX} ${TOP_Y} H ${X_F - 10}` }, ints);
   el("path", { "class": "wire", d: `M ${X_F} ${ACT_Y} V ${TOP_Y + 10}` }, ints);
 
   // ---- + on top wire (right of forget ×) ----

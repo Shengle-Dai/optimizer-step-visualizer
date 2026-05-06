@@ -1,0 +1,25 @@
+So this is a visualization of how our STM works and yeah, we can just pick a sentence, so I'll just choose the process and the movie was not bad and walk through it.
+So we can click the compute gates.
+Compute gates is the first phase inside of one token.
+So for each token, it's broken into four phases.
+Yeah, the first phase is to compute the gate values.
+And yeah, here's the explanation of what this phase is doing.
+Yeah, and yeah, keep going.
+The second phase is to demonstrate the four gate exits in more memory.
+It's a four gate gate.
+And the third phase is to learn gate.
+And the fourth phase is just to make the output.
+And yeah, we can also click next token to like see the whole four phase for one token.
+Yeah, that's good.
+No, it's unnecessary.
+Those things words.
+Yeah, so here we see not as a negation queue.
+So we in the cell, in the cell state memory, it stores the information of the negation.
+And so for the next token, the bad, it contains the like negative sentiment.
+So with the negation, it converts the negative sentiments into positive.
+So this is how the LSTM predicts the positive sentiment.
+And yeah, here's the tool tips.
+And when you hover on it, you can see the explanation on the words if you forgot.
+And it also shows like when those will be fired, will be triggered.
+Like when you see the word not, you trigger the negation like cell state memory.
+Yeah.

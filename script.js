@@ -46,7 +46,7 @@ const PRESETS = [
     teaches: "Negative evidence accumulates without surprises."
   },
   {
-    text:    "Although the beginning was slow, the ending was amazing.",
+    text:    "The beginning was slow, although the ending was amazing.",
     label:   "Long-range contrast",
     teaches: "Contrast cue lets later evidence dominate the prediction."
   },
@@ -133,7 +133,7 @@ function classifyToken(token) {
 // ============================================================
 
 function computeForgetGate(type) {
-  if (type === "contrast") return 0.45;
+  if (type === "contrast") return 0.30;
   return 0.85;
 }
 
@@ -147,8 +147,8 @@ function computeInputGate(type) {
 function computeCandidate(token, type) {
   if (type === "positive") return 1;
   if (type === "negative") return -1;
-  if (type === "negation") return 0; // stored in negation channel
-  if (type === "contrast") return 0;
+  if (type === "negation") return 1; // +1 written to dedicated negation slot
+  if (type === "contrast") return 1; // +1 written to dedicated contrast slot
   return 0;
 }
 
@@ -184,8 +184,6 @@ function applyInputGate(i, candidate, type) {
     state.cellState.negation += i * 1.0;
   } else if (type === "contrast") {
     state.cellState.contrast += i * 1.0;
-    state.cellState.positive *= 0.65;
-    state.cellState.negative *= 0.65;
   }
 }
 
@@ -217,9 +215,11 @@ function computeSentiment() {
 // ============================================================
 
 function phaseCompute(token, type) {
-  state._negationWasActive = state.cellState.negation > 0.4;
+  // Use post-forget value so this flag matches the check inside applyInputGate.
+  const f = computeForgetGate(type);
+  state._negationWasActive = (state.cellState.negation * f) > 0.4;
   state.gates = {
-    forget:    computeForgetGate(type),
+    forget:    f,
     input:     computeInputGate(type),
     candidate: computeCandidate(token, type),
     output:    computeOutputGate(type)
@@ -271,7 +271,7 @@ function generateExplanation(token, type) {
   }
 
   if (type === "contrast") {
-    return `${tok} signals contrast. The <span class="cl-forget">forget gate</span> drops (~0.45), partially erasing prior sentiment so future evidence has more weight. A contrast signal is written to memory.`;
+    return `${tok} signals contrast. The <span class="cl-forget">forget gate</span> drops (~0.30), partially erasing prior sentiment so future evidence has more weight. A contrast signal is written to memory.`;
   }
 
   return "";
@@ -288,8 +288,8 @@ function generatePhaseExplanation(phase, token, type) {
 
   if (phase === 0) {
     let typeNote = "";
-    if (type === "negation")  typeNote = ` It's a <strong class="warn">negation cue</strong>, so the input gate is high but the candidate has no sentiment content (it'll be stored in the dedicated negation channel instead).`;
-    else if (type === "contrast") typeNote = ` It's a <strong>contrast cue</strong>, so the forget gate drops sharply — old sentiment is about to get partially wiped.`;
+    if (type === "negation")  typeNote = ` It's a <strong class="warn">negation cue</strong>, so the candidate is +1 written to the dedicated <em>negation</em> channel (not the sentiment channels).`;
+    else if (type === "contrast") typeNote = ` It's a <strong>contrast cue</strong>, so the forget gate drops sharply — old sentiment is about to get partially wiped — and the candidate is +1 written to the dedicated <em>contrast</em> channel.`;
     else if (type === "positive") typeNote = ` It's a <strong style="color:var(--positive);">positive</strong> sentiment word, so the candidate is +1 and the input gate is high.`;
     else if (type === "negative") typeNote = ` It's a <strong style="color:var(--negative);">negative</strong> sentiment word, so the candidate is −1 and the input gate is high.`;
     else typeNote = ` It carries little sentiment, so the input gate stays low — almost nothing new will be written.`;
@@ -356,10 +356,12 @@ function finalSummary() {
     why = " The model used remembered <em>negation</em> to flip a negative word into positive.";
   } else if (cs.contrast > 0.3) {
     why = " The model down-weighted earlier sentiment after a <em>contrast</em> word, letting later evidence dominate.";
-  } else if (cs.positive > cs.negative) {
+  } else if (label === "Positive") {
     why = " Positive evidence accumulated across the sentence.";
-  } else if (cs.negative > cs.positive) {
+  } else if (label === "Negative") {
     why = " Negative evidence accumulated across the sentence.";
+  } else {
+    why = " Positive and negative evidence stayed too close to commit either way.";
   }
   return `<strong>Final prediction: ${label}.</strong>${why}`;
 }
@@ -1053,6 +1055,18 @@ function buildCell(index, xOffset, parent) {
 
   // ---- Internals group (fades when cell is inactive) ----
   const ints = el("g", { "class": "cell-internals" }, g);
+
+  // ---- Wire labels: cell-state c_{t-1} entering, c_t exiting along the top wire ----
+  el("text", {
+    "class": "wire-label",
+    x: BX + 6, y: TOP_Y - 7,
+    "text-anchor": "start"
+  }, ints).textContent = "cₜ₋₁";
+  el("text", {
+    "class": "wire-label",
+    x: BX + BW - 6, y: TOP_Y - 7,
+    "text-anchor": "end"
+  }, ints).textContent = "cₜ";
 
   // h_{t-1}/x_t bus across the bottom of the cell, reaching all gates
   el("path", { "class": "wire", d: `M ${BX} ${BUS_Y} H ${X_O}` }, ints);

@@ -688,6 +688,16 @@ button.active {
   opacity: 0;
 }
 
+/* Cell-state and hidden-state wire labels (c_{t-1}, c_t, h_{t-1}) — only on active cell */
+.wire-label {
+  font: italic 700 11px var(--mono);
+  fill: #0f172a;
+  pointer-events: none;
+}
+.cell-group.faded .wire-label {
+  opacity: 0;
+}
+
 /* Tooltip cursor on internals */
 .cell-group .activation-box[data-tooltip] {
   cursor: help;
